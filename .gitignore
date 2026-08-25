@@ -1,0 +1,20 @@
+# Compiled object files
+*.o
+
+# Compiled binaries
+unix_c/examples/test_api_raw
+unix_c/examples/test_api_xml
+unix_c/tests/test_netacuity_api
+unix_c/apache/mod_netacuity.so
+
+# IDE files
+.idea/
+*.iml
+*.ipr
+*.iws
+.vscode/
+
+# OS files
+.DS_Store
+Thumbs.db
+*~

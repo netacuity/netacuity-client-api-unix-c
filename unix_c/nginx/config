@@ -1,0 +1,23 @@
+# Copyright 2026 Digital Envoy, Inc.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     https://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+ngx_addon_name=ngx_http_netacuity_module
+HTTP_MODULES="$HTTP_MODULES ngx_http_netacuity_module"
+
+### Edit the below line to specify the correct path for your environment
+NA_SRC_BASE_DIR="/home/netacuity/netacuity-client-api-unix-c/unix_c"
+
+NA_API_SRC="$NA_SRC_BASE_DIR/netacuity_api.c"
+NA_MODULE_SRC="$NA_SRC_BASE_DIR/nginx/ngx_http_netacuity_module.c"
+NGX_ADDON_SRCS="$NGX_ADDON_SRCS $NA_API_SRC $NA_MODULE_SRC"

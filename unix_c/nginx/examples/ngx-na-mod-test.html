@@ -1,0 +1,333 @@
+<!--
+  Copyright 2026 Digital Envoy, Inc.
+
+  Licensed under the Apache License, Version 2.0 (the "License");
+  you may not use this file except in compliance with the License.
+  You may obtain a copy of the License at
+
+      https://www.apache.org/licenses/LICENSE-2.0
+
+  Unless required by applicable law or agreed to in writing, software
+  distributed under the License is distributed on an "AS IS" BASIS,
+  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+  See the License for the specific language governing permissions and
+  limitations under the License.
+-->
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+<meta http-equiv="Pragma" content="no-cache" />
+<meta http-equiv="Expires" content="0" />
+<title>Nginx NetAcuity Mod Test Page</title>
+</head>
+<body>
+<div>
+Author: Digital Envoy<br/>
+Version: 7.0.0<br/>
+Release Date: 2026-06-22<br/>
+<br/>
+Copyright 2026, Digital Envoy, Inc. Licensed under the Apache License, Version 2.0.<br/>
+</div>
+<hr>
+<div>
+This html page is intended to be used with the example "netacuity_subfilter.conf" configuration for Nginx.
+</div>
+<div>
+<table>
+
+<tr><td>-</td></tr>
+<tr><td>na_ip:</td><td>#{na_ip}</td></tr>
+<tr><td>na_trans_id:</td><td>#{na_trans_id}</td></tr>
+<tr><td>na_error:</td><td>#{na_error}</td></tr>
+
+<tr><td>-</td></tr>
+<tr><td><b>FC 3</b></td></tr>
+<tr><td>na_country:</td><td>#{na_country}</td></tr>
+<tr><td>na_region:</td><td>#{na_region}</td></tr>
+<tr><td>na_city:</td><td>#{na_city}</td></tr>
+<tr><td>na_conn_speed:</td><td>#{na_conn_speed}</td></tr>
+<tr><td>na_country_conf:</td><td>#{na_country_conf}</td></tr>
+<tr><td>na_region_conf:</td><td>#{na_region_conf}</td></tr>
+<tr><td>na_city_conf:</td><td>#{na_city_conf}</td></tr>
+<tr><td>na_metro_code:</td><td>#{na_metro_code}</td></tr>
+<tr><td>na_latitude:</td><td>#{na_latitude}</td></tr>
+<tr><td>na_longitude:</td><td>#{na_longitude}</td></tr>
+<tr><td>na_country_code:</td><td>#{na_country_code}</td></tr>
+<tr><td>na_region_code:</td><td>#{na_region_code}</td></tr>
+<tr><td>na_city_code:</td><td>#{na_city_code}</td></tr>
+<tr><td>na_continent_code:</td><td>#{na_continent_code}</td></tr>
+<tr><td>na_two_letter_country:</td><td>#{na_two_letter_country}</td></tr>
+
+<tr><td>-</td></tr>
+<tr><td><b>FC 4</b></td></tr>
+<tr><td>na_edge_country:</td><td>#{na_edge_country}</td></tr>
+<tr><td>na_edge_region:</td><td>#{na_edge_region}</td></tr>
+<tr><td>na_edge_city:</td><td>#{na_edge_city}</td></tr>
+<tr><td>na_edge_conn_speed:</td><td>#{na_edge_conn_speed}</td></tr>
+<tr><td>na_edge_metro_code:</td><td>#{na_edge_metro_code}</td></tr>
+<tr><td>na_edge_latitude:</td><td>#{na_edge_latitude}</td></tr>
+<tr><td>na_edge_longitude:</td><td>#{na_edge_longitude}</td></tr>
+<tr><td>na_edge_postal_code:</td><td>#{na_edge_postal_code}</td></tr>
+<tr><td>na_edge_country_code:</td><td>#{na_edge_country_code}</td></tr>
+<tr><td>na_edge_region_code:</td><td>#{na_edge_region_code}</td></tr>
+<tr><td>na_edge_city_code:</td><td>#{na_edge_city_code}</td></tr>
+<tr><td>na_edge_continent_code:</td><td>#{na_edge_continent_code}</td></tr>
+<tr><td>na_edge_two_letter_country:</td><td>#{na_edge_two_letter_country}</td></tr>
+<tr><td>na_edge_internal_code:</td><td>#{na_edge_internal_code}</td></tr>
+<tr><td>na_edge_area_codes:</td><td>#{na_edge_area_codes}</td></tr>
+<tr><td>na_edge_country_conf:</td><td>#{na_edge_country_conf}</td></tr>
+<tr><td>na_edge_region_conf:</td><td>#{na_edge_region_conf}</td></tr>
+<tr><td>na_edge_city_conf:</td><td>#{na_edge_city_conf}</td></tr>
+<tr><td>na_edge_postal_conf:</td><td>#{na_edge_postal_conf}</td></tr>
+<tr><td>na_edge_gmt_offset:</td><td>#{na_edge_gmt_offset}</td></tr>
+<tr><td>na_edge_in_dst:</td><td>#{na_edge_in_dst}</td></tr>
+<tr><td>na_edge_timezone_name:</td><td>#{na_edge_timezone_name}</td></tr>
+
+<tr><td>-</td></tr>
+<tr><td><b>FC 7</b></td></tr>
+<tr><td>na_area_code:</td><td>#{na_area_code}</td></tr>
+<tr><td>na_gmt_offset:</td><td>#{na_gmt_offset}</td></tr>
+<tr><td>na_in_dst:</td><td>#{na_in_dst}</td></tr>
+<tr><td>na_zip_code_text:</td><td>#{na_zip_code_text}</td></tr>
+<tr><td>na_zip_country:</td><td>#{na_zip_country}</td></tr>
+<tr><td>na_timezone_name:</td><td>#{na_timezone_name}</td></tr>
+
+<tr><td>-</td></tr>
+<tr><td><b>FC 8</b></td></tr>
+<tr><td>na_isp_name:</td><td>#{na_isp_name}</td></tr>
+
+<tr><td>-</td></tr>
+<tr><td><b>FC 9</b></td></tr>
+<tr><td>na_homebiz_type:</td><td>#{na_homebiz_type}</td></tr>
+
+<tr><td>-</td></tr>
+<tr><td><b>FC 10</b></td></tr>
+<tr><td>na_asn:</td><td>#{na_asn}</td></tr>
+<tr><td>na_asn_name:</td><td>#{na_asn_name}</td></tr>
+
+<tr><td>-</td></tr>
+<tr><td><b>FC 11</b></td></tr>
+<tr><td>na_primary_lang:</td><td>#{na_primary_lang}</td></tr>
+<tr><td>na_secondary_lang:</td><td>#{na_secondary_lang}</td></tr>
+
+<tr><td>-</td></tr>
+<tr><td><b>FC 12</b></td></tr>
+<tr><td>na_proxy_type:</td><td>#{na_proxy_type}</td></tr>
+<tr><td>na_proxy_description:</td><td>#{na_proxy_description}</td></tr>
+
+<tr><td>-</td></tr>
+<tr><td><b>FC 14</b></td></tr>
+<tr><td>na_is_an_isp:</td><td>#{na_is_an_isp}</td></tr>
+
+<tr><td>-</td></tr>
+<tr><td><b>FC 15</b></td></tr>
+<tr><td>na_company_name:</td><td>#{na_company_name}</td></tr>
+
+<tr><td>-</td></tr>
+<tr><td><b>FC 16</b></td></tr>
+<tr><td>na_domain_name:</td><td>#{na_domain_name}</td></tr>
+<tr><td>na_domain_key:</td><td>#{na_domain_key}</td></tr>
+
+<tr><td>-</td></tr>
+<tr><td><b>FC 17</b></td></tr>
+<tr><td>na_rank:</td><td>#{na_rank}</td></tr>
+<tr><td>na_households:</td><td>#{na_households}</td></tr>
+<tr><td>na_women:</td><td>#{na_women}</td></tr>
+<tr><td>na_w18_34:</td><td>#{na_w18_34}</td></tr>
+<tr><td>na_w35_49:</td><td>#{na_w35_49}</td></tr>
+<tr><td>na_men:</td><td>#{na_men}</td></tr>
+<tr><td>na_m18_34:</td><td>#{na_m18_34}</td></tr>
+<tr><td>na_m35_49:</td><td>#{na_m35_49}</td></tr>
+<tr><td>na_teens:</td><td>#{na_teens}</td></tr>
+<tr><td>na_kids:</td><td>#{na_kids}</td></tr>
+
+<tr><td>-</td></tr>
+<tr><td><b>FC 18</b></td></tr>
+<tr><td>na_naics_code:</td><td>#{na_naics_code}</td></tr>
+
+<tr><td>-</td></tr>
+<tr><td><b>FC 19</b></td></tr>
+<tr><td>na_cbsa_code:</td><td>#{na_cbsa_code}</td></tr>
+<tr><td>na_cbsa_title:</td><td>#{na_cbsa_title}</td></tr>
+<tr><td>na_cbsa_type:</td><td>#{na_cbsa_type}</td></tr>
+<tr><td>na_csa_code:</td><td>#{na_csa_code}</td></tr>
+<tr><td>na_csa_title:</td><td>#{na_csa_title}</td></tr>
+<tr><td>na_md_code:</td><td>#{na_md_code}</td></tr>
+<tr><td>na_md_title:</td><td>#{na_md_title}</td></tr>
+
+<tr><td>-</td></tr>
+<tr><td><b>FC 21</b></td></tr>
+<tr><td>na_pulsemax_country:</td><td>#{na_pulsemax_country}</td></tr>
+<tr><td>na_pulsemax_region:</td><td>#{na_pulsemax_region}</td></tr>
+<tr><td>na_pulsemax_city:</td><td>#{na_pulsemax_city}</td></tr>
+<tr><td>na_pulsemax_conn_speed:</td><td>#{na_pulsemax_conn_speed}</td></tr>
+<tr><td>na_pulsemax_conn_type:</td><td>#{na_pulsemax_conn_type}</td></tr>
+<tr><td>na_pulsemax_metro_code:</td><td>#{na_pulsemax_metro_code}</td></tr>
+<tr><td>na_pulsemax_latitude:</td><td>#{na_pulsemax_latitude}</td></tr>
+<tr><td>na_pulsemax_longitude:</td><td>#{na_pulsemax_longitude}</td></tr>
+<tr><td>na_pulsemax_postal_code:</td><td>#{na_pulsemax_postal_code}</td></tr>
+<tr><td>na_pulsemax_country_code:</td><td>#{na_pulsemax_country_code}</td></tr>
+<tr><td>na_pulsemax_region_code:</td><td>#{na_pulsemax_region_code}</td></tr>
+<tr><td>na_pulsemax_city_code:</td><td>#{na_pulsemax_city_code}</td></tr>
+<tr><td>na_pulsemax_continent_code:</td><td>#{na_pulsemax_continent_code}</td></tr>
+<tr><td>na_pulsemax_two_letter_country:</td><td>#{na_pulsemax_two_letter_country}</td></tr>
+<tr><td>na_pulsemax_internal_code:</td><td>#{na_pulsemax_internal_code}</td></tr>
+<tr><td>na_pulsemax_area_codes:</td><td>#{na_pulsemax_area_codes}</td></tr>
+<tr><td>na_pulsemax_country_conf:</td><td>#{na_pulsemax_country_conf}</td></tr>
+<tr><td>na_pulsemax_region_conf:</td><td>#{na_pulsemax_region_conf}</td></tr>
+<tr><td>na_pulsemax_city_conf:</td><td>#{na_pulsemax_city_conf}</td></tr>
+<tr><td>na_pulsemax_postal_conf:</td><td>#{na_pulsemax_postal_conf}</td></tr>
+<tr><td>na_pulsemax_gmt_offset:</td><td>#{na_pulsemax_gmt_offset}</td></tr>
+<tr><td>na_pulsemax_in_dst:</td><td>#{na_pulsemax_in_dst}</td></tr>
+<tr><td>na_pulsemax_timezone_name:</td><td>#{na_pulsemax_timezone_name}</td></tr>
+
+<tr><td>-</td></tr>
+<tr><td><b>FC 24</b></td></tr>
+<tr><td>na_mobile_carrier:</td><td>#{na_mobile_carrier}</td></tr>
+<tr><td>na_mcc:</td><td>#{na_mcc}</td></tr>
+<tr><td>na_mnc:</td><td>#{na_mnc}</td></tr>
+<tr><td>na_mobile_carrier_code:</td><td>#{na_mobile_carrier_code}</td></tr>
+
+<tr><td>-</td></tr>
+<tr><td><b>FC 25</b></td></tr>
+<tr><td>na_organization_name:</td><td>#{na_organization_name}</td></tr>
+
+<tr><td>-</td></tr>
+<tr><td><b>FC 26</b></td></tr>
+<tr><td>na_pulse_country:</td><td>#{na_pulse_country}</td></tr>
+<tr><td>na_pulse_region:</td><td>#{na_pulse_region}</td></tr>
+<tr><td>na_pulse_city:</td><td>#{na_pulse_city}</td></tr>
+<tr><td>na_pulse_conn_speed:</td><td>#{na_pulse_conn_speed}</td></tr>
+<tr><td>na_pulse_conn_type:</td><td>#{na_pulse_conn_type}</td></tr>
+<tr><td>na_pulse_metro_code:</td><td>#{na_pulse_metro_code}</td></tr>
+<tr><td>na_pulse_latitude:</td><td>#{na_pulse_latitude}</td></tr>
+<tr><td>na_pulse_longitude:</td><td>#{na_pulse_longitude}</td></tr>
+<tr><td>na_pulse_postal_code:</td><td>#{na_pulse_postal_code}</td></tr>
+<tr><td>na_pulse_country_code:</td><td>#{na_pulse_country_code}</td></tr>
+<tr><td>na_pulse_region_code:</td><td>#{na_pulse_region_code}</td></tr>
+<tr><td>na_pulse_city_code:</td><td>#{na_pulse_city_code}</td></tr>
+<tr><td>na_pulse_continent_code:</td><td>#{na_pulse_continent_code}</td></tr>
+<tr><td>na_pulse_two_letter_country:</td><td>#{na_pulse_two_letter_country}</td></tr>
+<tr><td>na_pulse_internal_code:</td><td>#{na_pulse_internal_code}</td></tr>
+<tr><td>na_pulse_area_codes:</td><td>#{na_pulse_area_codes}</td></tr>
+<tr><td>na_pulse_country_conf:</td><td>#{na_pulse_country_conf}</td></tr>
+<tr><td>na_pulse_region_conf:</td><td>#{na_pulse_region_conf}</td></tr>
+<tr><td>na_pulse_city_conf:</td><td>#{na_pulse_city_conf}</td></tr>
+<tr><td>na_pulse_postal_conf:</td><td>#{na_pulse_postal_conf}</td></tr>
+<tr><td>na_pulse_gmt_offset:</td><td>#{na_pulse_gmt_offset}</td></tr>
+<tr><td>na_pulse_in_dst:</td><td>#{na_pulse_in_dst}</td></tr>
+<tr><td>na_pulse_timezone_name:</td><td>#{na_pulse_timezone_name}</td></tr>
+
+<tr><td>-</td></tr>
+<tr><td><b>FC 30</b></td></tr>
+<tr><td>na_pulseplus_country:</td><td>#{na_pulseplus_country}</td></tr>
+<tr><td>na_pulseplus_region:</td><td>#{na_pulseplus_region}</td></tr>
+<tr><td>na_pulseplus_city:</td><td>#{na_pulseplus_city}</td></tr>
+<tr><td>na_pulseplus_conn_speed:</td><td>#{na_pulseplus_conn_speed}</td></tr>
+<tr><td>na_pulseplus_conn_type:</td><td>#{na_pulseplus_conn_type}</td></tr>
+<tr><td>na_pulseplus_metro_code:</td><td>#{na_pulseplus_metro_code}</td></tr>
+<tr><td>na_pulseplus_latitude:</td><td>#{na_pulseplus_latitude}</td></tr>
+<tr><td>na_pulseplus_longitude:</td><td>#{na_pulseplus_longitude}</td></tr>
+<tr><td>na_pulseplus_postal_code:</td><td>#{na_pulseplus_postal_code}</td></tr>
+<tr><td>na_pulseplus_postal_ext:</td><td>#{na_pulseplus_postal_ext}</td></tr>
+<tr><td>na_pulseplus_country_code:</td><td>#{na_pulseplus_country_code}</td></tr>
+<tr><td>na_pulseplus_region_code:</td><td>#{na_pulseplus_region_code}</td></tr>
+<tr><td>na_pulseplus_city_code:</td><td>#{na_pulseplus_city_code}</td></tr>
+<tr><td>na_pulseplus_continent_code:</td><td>#{na_pulseplus_continent_code}</td></tr>
+<tr><td>na_pulseplus_two_letter_country:</td><td>#{na_pulseplus_two_letter_country}</td></tr>
+<tr><td>na_pulseplus_internal_code:</td><td>#{na_pulseplus_internal_code}</td></tr>
+<tr><td>na_pulseplus_area_codes:</td><td>#{na_pulseplus_area_codes}</td></tr>
+<tr><td>na_pulseplus_country_conf:</td><td>#{na_pulseplus_country_conf}</td></tr>
+<tr><td>na_pulseplus_region_conf:</td><td>#{na_pulseplus_region_conf}</td></tr>
+<tr><td>na_pulseplus_city_conf:</td><td>#{na_pulseplus_city_conf}</td></tr>
+<tr><td>na_pulseplus_postal_conf:</td><td>#{na_pulseplus_postal_conf}</td></tr>
+<tr><td>na_pulseplus_gmt_offset:</td><td>#{na_pulseplus_gmt_offset}</td></tr>
+<tr><td>na_pulseplus_in_dst:</td><td>#{na_pulseplus_in_dst}</td></tr>
+<tr><td>na_pulseplus_timezone_name:</td><td>#{na_pulseplus_timezone_name}</td></tr>
+
+<tr><td>-</td></tr>
+<tr><td><b>FC 33</b></td></tr>
+<tr><td>na_vpn_proxy_type:</td><td>#{na_vpn_proxy_type}</td></tr>
+<tr><td>na_vpn_proxy_description:</td><td>#{na_vpn_proxy_description}</td></tr>
+<tr><td>na_vpn_proxy_node:</td><td>#{na_vpn_proxy_node}</td></tr>
+<tr><td>na_vpn_proxy_names:</td><td>#{na_vpn_proxy_names}</td></tr>
+
+<tr><td>-</td></tr>
+<tr><td><b>FC 35</b></td></tr>
+<tr><td>na_ipc_obs_count:</td><td>#{na_ipc_obs_count}</td></tr>
+<tr><td>na_ipc_distinct_device_ids:</td><td>#{na_ipc_distinct_device_ids}</td></tr>
+<tr><td>na_ipc_distinct_countries:</td><td>#{na_ipc_distinct_countries}</td></tr>
+<tr><td>na_ipc_distinct_regions:</td><td>#{na_ipc_distinct_regions}</td></tr>
+<tr><td>na_ipc_distinct_cities:</td><td>#{na_ipc_distinct_cities}</td></tr>
+<tr><td>na_ipc_distinct_postals:</td><td>#{na_ipc_distinct_postals}</td></tr>
+<tr><td>na_ipc_avg_dist:</td><td>#{na_ipc_avg_dist}</td></tr>
+<tr><td>na_ipc_max_dist:</td><td>#{na_ipc_max_dist}</td></tr>
+<tr><td>na_ipc_dist_std_dev:</td><td>#{na_ipc_dist_std_dev}</td></tr>
+<tr><td>na_ipc_last_seen:</td><td>#{na_ipc_last_seen}</td></tr>
+<tr><td>na_ipc_radius_weeks_stable:</td><td>#{na_ipc_radius_weeks_stable}</td></tr>
+<tr><td>na_ipc_score:</td><td>#{na_ipc_score}</td></tr>
+<tr><td>na_ipc_country_weeks_stable:</td><td>#{na_ipc_country_weeks_stable}</td></tr>
+<tr><td>na_ipc_region_weeks_stable:</td><td>#{na_ipc_region_weeks_stable}</td></tr>
+<tr><td>na_ipc_city_weeks_stable:</td><td>#{na_ipc_city_weeks_stable}</td></tr>
+<tr><td>na_ipc_postal_weeks_stable:</td><td>#{na_ipc_postal_weeks_stable}</td></tr>
+
+<tr><td>-</td></tr>
+<tr><td><b>FC 36</b></td></tr>
+<tr><td>na_host_info:</td><td>#{na_host_info}</td></tr>
+
+<tr><td>-</td></tr>
+<tr><td><b>FC 37</b></td></tr>
+<tr><td>na_oc_iso3_1wk:</td><td>#{na_oc_iso3_1wk}</td></tr>
+<tr><td>na_oc_iso2_1wk:</td><td>#{na_oc_iso2_1wk}</td></tr>
+<tr><td>na_oc_iso3_5wk:</td><td>#{na_oc_iso3_5wk}</td></tr>
+<tr><td>na_oc_iso2_5wk:</td><td>#{na_oc_iso2_5wk}</td></tr>
+
+<tr><td>-</td></tr>
+<tr><td><b>FC 40</b></td></tr>
+<tr><td>na_aa_sa1_country:</td><td>#{na_aa_sa1_country}</td></tr>
+<tr><td>na_aa_sa1_value:</td><td>#{na_aa_sa1_value}</td></tr>
+
+<tr><td>-</td></tr>
+<tr><td><b>FC 41</b></td></tr>
+<tr><td>na_aamax_sa1_country:</td><td>#{na_aamax_sa1_country}</td></tr>
+<tr><td>na_aamax_sa1_value:</td><td>#{na_aamax_sa1_value}</td></tr>
+
+<tr><td>-</td></tr>
+<tr><td><b>FC 42</b></td></tr>
+<tr><td>na_aa_iris_country:</td><td>#{na_aa_iris_country}</td></tr>
+<tr><td>na_aa_iris_value:</td><td>#{na_aa_iris_value}</td></tr>
+
+<tr><td>-</td></tr>
+<tr><td><b>FC 43</b></td></tr>
+<tr><td>na_aa_plz8_country:</td><td>#{na_aa_plz8_country}</td></tr>
+<tr><td>na_aa_plz8_value:</td><td>#{na_aa_plz8_value}</td></tr>
+
+<tr><td>-</td></tr>
+<tr><td><b>FC 44</b></td></tr>
+<tr><td>na_aa_zip4_country:</td><td>#{na_aa_zip4_country}</td></tr>
+<tr><td>na_aa_zip4_value:</td><td>#{na_aa_zip4_value}</td></tr>
+
+<tr><td>-</td></tr>
+<tr><td><b>FC 45</b></td></tr>
+<tr><td>na_aamax_zip4_country:</td><td>#{na_aamax_zip4_country}</td></tr>
+<tr><td>na_aamax_zip4_value:</td><td>#{na_aamax_zip4_value}</td></tr>
+
+<tr><td>-</td></tr>
+<tr><td><b>FC 46</b></td></tr>
+<tr><td>na_aamax_iris_country:</td><td>#{na_aamax_iris_country}</td></tr>
+<tr><td>na_aamax_iris_value:</td><td>#{na_aamax_iris_value}</td></tr>
+
+<tr><td>-</td></tr>
+<tr><td><b>FC 47</b></td></tr>
+<tr><td>na_aamax_plz8_country:</td><td>#{na_aamax_plz8_country}</td></tr>
+<tr><td>na_aamax_plz8_value:</td><td>#{na_aamax_plz8_value}</td></tr>
+
+<tr><td>-</td></tr>
+
+</table>
+</div>
+</body>
+</html>
+
