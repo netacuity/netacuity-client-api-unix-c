@@ -1,0 +1,50 @@
+Copyright 2026 Digital Envoy, Inc.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    https://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+
+==============================================================================
+
+README for NetAcuity Client API
+
+==============================================================================
+
+
+The NetAcuity Client API provides support for querying the NetAcuity Server
+for IPv4 and IPv6 addresses using the "XML UDP" network query protocol.
+
+The XML UDP query protocol supports multiple feature-codes per call
+with the results merged together.
+
+The request uses these parameters:
+  - Feature Code(s):  one or more integers, each identifying a particular
+        NetAcuity DB
+  - Query IP:  the IP address (IPv4 or IPv6) to be queried for associated data
+  - API ID:  an arbitrary integer to track query statistics
+        (valid values are 0 to 127 inclusive)
+  - Transaction ID:  an arbitrary string to identify a particular query
+  - Server IP:  the IP address of the NetAcuity Server
+  - Timeout:  the timeout for awaiting a response from the NetAcuity Server
+
+If an error occurs, a non-blank error message will be present in the "error"
+attribute in the XML response. Any unrecognized feature-codes will result in
+a "DB Not Loaded" error response.
+
+==============================================================================
+
+The details on each of the NetAcuity Database feature-codes,
+including a list of their respective fields, is available
+in the NetAcuity documentation at:
+
+    https://docs.netacuity.com/
+
+==============================================================================
