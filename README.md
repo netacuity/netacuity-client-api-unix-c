@@ -9,7 +9,6 @@ unix_c/
 ├── netacuity_api.c       # Core API library
 ├── netacuity_api.h       # Public API header
 ├── netacuity_fields.h    # Field definitions and dictionary
-├── strtok.c              # strtok_r fallback for older systems
 ├── PROTOCOL.txt          # Detailed API documentation
 ├── BUILD_NOTES.txt       # Build/compiler notes
 ├── apache/               # Apache httpd server module
@@ -25,7 +24,9 @@ unix_c/
 │   └── README_nginx.txt
 ├── examples/             # Standalone example programs
 │   ├── test_api_xml.c
-│   └── Makefile.test_api_xml
+│   ├── Makefile.test_api_xml
+│   ├── test_api_persistent.c
+│   └── Makefile.test_api_persistent
 └── tests/                # Unit tests (no server required)
     ├── test_netacuity_api.c
     └── Makefile
@@ -110,7 +111,10 @@ int main(void) {
 
 ### `na_client_t *na_client_new(const char *server_ip, int api_id, int timeout_us)`
 
-Allocates and initializes a client handle bound to a single NetAcuity Server address, API ID (0-127; 0 is "unregistered"), and timeout (in microseconds, covering both connect and query). Must be passed explicitly to every query function below. Returns `NULL` if `server_ip` is not a well-formed IPv4/IPv6 literal, `api_id` is not between 0 and 127, or allocation fails.
+Allocates and initializes a client handle bound to a single NetAcuity Server address, API ID (0-127; 0 is
+"unregistered"), and timeout (in microseconds, covering both connect and query, rounded up to whole milliseconds). Must
+be passed explicitly to every query function below. Returns `NULL` if `server_ip` is not a well-formed IPv4/IPv6
+literal, `api_id` is not between 0 and 127, `timeout_us` is not positive, or allocation fails.
 
 A client handle is immutable once created and holds no per-query state, so a single handle may be shared freely across threads — each query creates and closes its own socket. Create additional handles only when you need a different server, API ID, or timeout.
 
@@ -128,9 +132,39 @@ Releases a client handle allocated by `na_client_new()`. Passing `NULL` is a no-
 
 ### `int na_query_xml(na_client_t *client, const char *query_ip, const char *feature_codes, const char *transaction_id, char *response, size_t max_size, char *error_msg)`
 
-Queries one or more databases (`feature_codes`, a comma-separated list of feature codes) for `query_ip` using the XML UDP protocol. `transaction_id` may be `NULL` or `""` to have one generated automatically. The response is an XML string — parse it with `libxml2` or your own XML parser.
+Queries one or more databases (`feature_codes`, a comma-separated list of feature codes) for `query_ip` using the XML
+UDP protocol. The response is an XML string — parse it with `libxml2` or your own XML parser.
+
+- `transaction_id`: at most `MAX_TRANSACTION_ID - 1` (63) characters, or `NULL` or `""` to have one generated
+  automatically. A longer ID is rejected with an error.
+- `response`, `max_size`: the caller's buffer for the response, and its size in bytes. A response that doesn't fit is an
+  error. After any error, `response` may hold part of a response, so use it only on success. `MAX_XML_RESPONSE_SIZE`
+  fits any response.
+- `error_msg`: a buffer of at least `MAX_ERROR_MSG_LEN` bytes, which receives the reason for any error (`""` on
+  success).
 
 Returns 1 on success, 0 on error.
+
+### `na_connection_t *na_connection_new(const na_client_t *client)`
+
+Allocates a persistent connection to the client's NetAcuity Server: a copy of the client's settings plus one UDP socket that is kept open across queries, instead of a new socket for every query as `na_query_xml()` uses. Suited to long-lived processes that make many queries. The client may be freed once the connection is created. Returns `NULL` if `client` is `NULL` or allocation fails.
+
+The socket is opened by the first query. A query that fails after sending its request (a timeout, a mismatched response, a server-reported error) closes the socket, and the next query opens a new one.
+
+Unlike a client handle, a connection must not be used by more than one thread at a time — use one connection per thread — and must not be shared between a parent and child process after `fork()`.
+
+### `int na_connection_query_xml(na_connection_t *conn, const char *query_ip, const char *feature_codes, const char *transaction_id, char *response, size_t max_size, char *error_msg)`
+
+Same as `na_query_xml()`, with the same parameters and limits (including the 63-character `transaction_id`), but sends
+the query over the connection's socket. Every query on a connection must use a different `transaction_id`, or pass
+`NULL` or `""` to have one generated: a late duplicate of an earlier response can arrive on a re-used socket, and only
+the transaction ID tells it apart.
+
+Returns 1 on success, 0 on error.
+
+### `void na_connection_free(na_connection_t *conn)`
+
+Closes the connection's socket and releases the connection. Passing `NULL` is a no-op.
 
 ### `char *get_xml_field(const char *response, const char *field_name, char *value, size_t size)`
 
@@ -138,7 +172,7 @@ Returns 1 on success, 0 on error.
 
 ## Feature Codes
 
-For the complete, up-to-date list of feature codes and their response fields, see the [NetAcuity documentation](https://docs.netacuity.com/).
+For the complete, up-to-date list of feature codes and their response fields, see the [NetAcuity documentation](https://docs.digitalelement.com/).
 
 ## Examples
 
@@ -149,11 +183,16 @@ Runnable examples are provided in the `examples/` directory. These require a run
 cd unix_c/examples
 make -f Makefile.test_api_xml
 ./test_api_xml <server_ip> <query_ip> <feature_codes>
+
+# Persistent-connection example (queries several IPs over one socket)
+make -f Makefile.test_api_persistent
+./test_api_persistent <server_ip> <feature_codes> <query_ip> [<query_ip> ...]
 ```
 
 ## Running the Tests
 
-The test suite covers all parsing and validation logic that does not require a running server.
+The test suite covers the parsing and validation logic, and runs the network tests against a mock server on 127.0.0.1,
+so it needs no running NetAcuity Server. It targets Linux.
 
 ```bash
 cd unix_c/tests
@@ -172,7 +211,7 @@ See [CHANGELOG.md](CHANGELOG.md) for release history.
 
 Technical Support is only available to those under active contract with Digital Element. To contact Support, use the contact information provided at contract initiation.
 
-- Documentation: [docs.netacuity.com](https://docs.netacuity.com/)
+- Documentation: [docs.digitalelement.com](https://docs.digitalelement.com/)
 - Issues: [GitHub Issues](https://github.com/netacuity/netacuity-client-api-unix-c/issues)
 
 ## License
@@ -181,4 +220,4 @@ Copyright 2026 Digital Envoy, Inc.
 
 Licensed under the Apache License, Version 2.0. See [LICENSE](LICENSE) for the full license text.
 
-With one exception, this repository contains only Digital Envoy source code, and no binaries. The exception is `unix_c/strtok.c`, a `strtok_r` implementation incorporated from the FreeBSD source tree and used under its BSD license (Copyright Softweyr LLC and The Regents of the University of California); its original license notice is retained at the top of the file and reproduced in [LICENSE](LICENSE). Third-party libraries referenced at build time (libxml2, Apache httpd/APR headers, Nginx headers) are supplied by the end developer's own system and are not redistributed by this repository.
+This repository contains only Digital Envoy source code, and no binaries. Third-party libraries referenced at build time (libxml2, Apache httpd/APR headers, Nginx headers) are supplied by the end developer's own system and are not redistributed by this repository.

@@ -32,6 +32,7 @@ The request uses these parameters:
   - API ID:  an arbitrary integer to track query statistics
         (valid values are 0 to 127 inclusive)
   - Transaction ID:  an arbitrary string to identify a particular query
+        (at most 63 characters)
   - Server IP:  the IP address of the NetAcuity Server
   - Timeout:  the timeout for awaiting a response from the NetAcuity Server
 
@@ -45,6 +46,6 @@ The details on each of the NetAcuity Database feature-codes,
 including a list of their respective fields, is available
 in the NetAcuity documentation at:
 
-    https://docs.netacuity.com/
+    https://docs.digitalelement.com/
 
 ==============================================================================

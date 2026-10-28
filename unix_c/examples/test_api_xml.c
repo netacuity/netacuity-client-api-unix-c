@@ -94,7 +94,7 @@ int main(int argc, char **argv)
             continue;
         }
         xmlChar *value = xmlNodeListGetString(root_node->doc, attr->children, 1);
-        printf("%s = %s\n", attr->name, value );
+        printf("%s = %s\n", attr->name, value ? (const char *) value : "");
         xmlFree(value);
     }
     xmlFreeDoc(xml_doc);

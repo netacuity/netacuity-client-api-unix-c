@@ -30,6 +30,8 @@
 #include "ap_mpm.h"
 #include "ap_release.h"
 
+#include <limits.h>
+
 #include <libxml/tree.h>
 
 #include "netacuity_api.h"
@@ -67,6 +69,8 @@ static void *na_apache_server_config(apr_pool_t *p, server_rec *s)
 {
     srand(time(NULL));
     na_apache_conf_t *cfg = (na_apache_conf_t *)apr_pcalloc(p, sizeof(na_apache_conf_t));
+    // Used if there is no NetAcuityTimeout directive.
+    cfg->timeout = NA_DEFAULT_TIMEOUT;
     return cfg;
 }
 
@@ -125,8 +129,11 @@ static int na_apache_post_conf(apr_pool_t *p, apr_pool_t *plog, apr_pool_t *ptem
     cfg->client = na_client_new(cfg->serverIP, cfg->id, cfg->timeout * 1000);
     if (!cfg->client)
     {
+        // NetAcuityID and NetAcuityTimeout are range-checked when the config
+        // is read, so a bad server address (or out of memory) is what's left.
         ap_log_error(APLOG_MARK, APLOG_ERR, 0, NULL,
-                     "%s: Error setting NetAcuity server address: %s.",
+                     "%s: Error creating NetAcuity client; check NetAcuityServer "
+                     "is an IPv4 or IPv6 address: %s.",
                      MODULE_NAME, cfg->serverIP);
         return AP_FILTER_ERROR;
     }
@@ -365,6 +372,7 @@ static const char *na_apache_get_timeout(cmd_parms *cmd, void *dummy, const char
 {
     na_apache_conf_t    *cfg;
     const char          *err;
+    apr_int64_t         timeout;
 
     cfg = (na_apache_conf_t *)ap_get_module_config(cmd->server->module_config,
                                                    &netacuity_module);
@@ -373,7 +381,14 @@ static const char *na_apache_get_timeout(cmd_parms *cmd, void *dummy, const char
         return err;
     }
 
-    cfg->timeout = (int)apr_atoi64(ap_getword_conf(cmd->pool, &arg));
+    timeout = apr_atoi64(ap_getword_conf(cmd->pool, &arg));
+    // The timeout is passed to na_client_new() in microseconds, as an int.
+    if (timeout < 0 || timeout > INT_MAX / 1000)
+    {
+        return apr_psprintf(cmd->pool, "NetAcuityTimeout must be between 0 and %d milliseconds",
+                            INT_MAX / 1000);
+    }
+    cfg->timeout = (int)timeout;
     if (cfg->timeout == 0)
     {
         cfg->timeout = NA_DEFAULT_TIMEOUT;
@@ -385,6 +400,7 @@ static const char *na_apache_get_id(cmd_parms *cmd, void *dummy, const char *arg
 {
     na_apache_conf_t    *cfg;
     const char          *err;
+    apr_int64_t         id;
 
     cfg = (na_apache_conf_t *)ap_get_module_config(cmd->server->module_config,
                                                    &netacuity_module);
@@ -393,7 +409,12 @@ static const char *na_apache_get_id(cmd_parms *cmd, void *dummy, const char *arg
         return err;
     }
 
-    cfg->id = (int)apr_atoi64(ap_getword_conf(cmd->pool, &arg));
+    id = apr_atoi64(ap_getword_conf(cmd->pool, &arg));
+    if (id < 0 || id > 127)
+    {
+        return "NetAcuityID must be between 0 and 127";
+    }
+    cfg->id = (int)id;
     return NULL;
 }
 
@@ -446,7 +467,7 @@ static const char *na_apache_get_lockfile(cmd_parms *cmd, void *dummy, const cha
     lockfile = ap_server_root_relative(cmd->pool, arg);
     if (!lockfile)
     {
-        return apr_pstrcat(cmd->pool, "Invalid NetAcuityLockfile: ", arg);
+        return apr_pstrcat(cmd->pool, "Invalid NetAcuityLockfile: ", arg, (char *)NULL);
     }
 
     return NULL;

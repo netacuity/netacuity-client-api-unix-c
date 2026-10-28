@@ -19,6 +19,7 @@
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <sys/time.h>
+#include <poll.h>
 #include <sys/uio.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
@@ -41,6 +42,15 @@ struct na_client
     int  timeout;      // in microseconds (us)
     int  api_id;
     int  ip_family;    // AF_INET or AF_INET6
+};
+
+/* Persistent connection: a copy of a client's config, plus a UDP socket that
+ * is kept open between queries. Not safe to use from more than one thread at
+ * a time. */
+struct na_connection
+{
+    na_client_t client;
+    int         sockfd;    // -1 when not open
 };
 
 /* Struct to receive XML response into */
@@ -206,12 +216,13 @@ static int (*na_socket_create)(int, int, int) = socket;
 //                          "unregistered".
 //             timeout_us - Maximum time to wait on network calls, in
 //                          microseconds (this includes both connect and
-//                          query). There is no default -- pass 2000000
-//                          (2 seconds) for a typical timeout.
+//                          query). Must be positive. There is no
+//                          default -- pass 2000000 (2 seconds) for a
+//                          typical timeout.
 //
 // Returns: A new client handle, or NULL if server_ip is not a well-formed
-//          IPv4 or IPv6 literal, api_id is not between 0 and 127, or if
-//          allocation fails.
+//          IPv4 or IPv6 literal, api_id is not between 0 and 127,
+//          timeout_us is not positive, or if allocation fails.
 //
 // ****************************************************************************
 na_client_t *na_client_new(const char *server_ip, int api_id, int timeout_us)
@@ -226,6 +237,12 @@ na_client_t *na_client_new(const char *server_ip, int api_id, int timeout_us)
     }
 
     if ( api_id < 0 || api_id > 127 )
+    {
+        return NULL;
+    }
+
+    // A timeout of 0 would stop waiting before any response could arrive.
+    if ( timeout_us <= 0 )
     {
         return NULL;
     }
@@ -314,71 +331,33 @@ void na_client_free(na_client_t *client)
 
 // ****************************************************************************
 //
-// Function: na_query_xml()
+// Function: na_build_xml_request()
 //
-// Purpose: Queries the NetAcuity databases specified in feature_codes for
-//          the IP address passed and returns the response in the memory
-//          supplied by the caller.  The response will be an XML string
-//          that can be passed to your favorite XML parser.
-//          Make sure that the buffer "response" is large enough to handle
-//          the entire response, otherwise an error will occur and no
-//          response data will be returned.
-//          If a timeout or error occurs, it returns 0 and the
-//          error reason will be returned in "response".
+// Purpose: Validates the query parameters, and builds the XML request string
+//          for them.
 //
-// Parameters: ip          - IP address to query in dotted-notation
-//             feature_codes - Comma separated list of database features to query
-//             transaction_id - A user-supplied transaction ID (can be "", or
-//                           NULL to have one generated automatically)
-//             response    - Pointer to location response should be returned
-//             max_size    - The size of the response memory.  An error will
-//                           occur if response exceeds this size.
+// Parameters: client         - Client handle (for the api_id).
+//             query_ip       - IP address to query.
+//             feature_codes  - Comma separated list of database features to query.
+//             transaction_id - Transaction ID to include in the request.
+//             request        - Output buffer for the request string.
+//             request_size   - Size of the request buffer.
+//             error_msg      - Out: the reason for any failure.
 //
 //    Returns:  1 - Success
 //              0 - Error
 // ****************************************************************************
-int na_query_xml(na_client_t *client, const char *query_ip, const char *feature_code, const char *transaction_id,
-    char *response, size_t max_size, char *error_msg)
+static int na_build_xml_request(const na_client_t *client, const char *query_ip,
+    const char *feature_codes, const char *transaction_id,
+    char *request, size_t request_size, char *error_msg)
 {
-    int                sockfd;              // Socket
-    int                ret;                 // Hold various function return
-                                            // values
-    fd_set             fds;                 // Descriptor set for select()
-    struct timeval     tv;                  // Time structure
-    int                len;                 // Length parameter for send() call
-    api_xml_response   server_response;
-    unsigned int       dest_len;
     char               feature_string[MAX_FEATURE_CSV_LEN];  // csv of feature-codes
     char               *field;
     char               *temp_buf;
     int                db_number = 0;
-    char               request[MAX_XML_REQUEST_BUFF_SIZE];
     int                temp_result;
-    unsigned int       request_temp_len = 0;
+    size_t             request_temp_len = 0;
     int                dbs_found = 0;
-    int                num_packets_received = 0;
-    int                packets_to_receive = 1;
-    int                last_packet_num = 0;
-    char               thisPacketNum_str[XML_PACKET_NUM_DIGITS + 1];
-    char               numPacketsToReceive_str[XML_PACKET_NUM_DIGITS + 1];
-    size_t             response_len;
-    struct sockaddr_in6 dest_addr;           // Will hold the destination addr
-    struct sockaddr_in dest_addr4;           // Will hold the destination addr
-    struct in_addr api_server;
-    char               generated_transaction_id[MAX_TRANSACTION_ID];
-
-    if ( !client )
-    {
-        strcpy(error_msg, "Invalid client handle.");
-        return 0;
-    }
-
-    // A caller that omits a transaction ID (passes NULL) gets one generated automatically.
-    if ( !transaction_id )
-    {
-        generate_transaction_id(generated_transaction_id, sizeof(generated_transaction_id));
-        transaction_id = generated_transaction_id;
-    }
 
     // A '"', '<', '>', or '&' in transaction_id would break the hand-built XML attribute
     // syntax below. Checked first, ahead of every branch that could otherwise embed an
@@ -388,22 +367,22 @@ int na_query_xml(na_client_t *client, const char *query_ip, const char *feature_
         strcpy(error_msg, "Invalid transaction ID.");
         return 0;
     }
+    // The response's echoed trans-id is read back into a MAX_TRANSACTION_ID
+    // buffer, so a longer one could never match.
+    if (strlen(transaction_id) >= MAX_TRANSACTION_ID)
+    {
+        strcpy(error_msg, "Transaction ID is too long.");
+        return 0;
+    }
 
-    /* zero buffers */
-    bzero(thisPacketNum_str, sizeof(thisPacketNum_str));
-    bzero(numPacketsToReceive_str, sizeof(numPacketsToReceive_str));
-    strcpy(error_msg, "");
+    memset(request, 0, request_size);
 
-    memset(request, 0, sizeof(request));
-    memset(&server_response, 0, sizeof(server_response));
-
-    response[0] = '\0';
-    if (strlen(feature_code) >= sizeof(feature_string))
+    if (strlen(feature_codes) >= sizeof(feature_string))
     {
         strcpy(error_msg, "Feature-code list is too long.");
         return 0;
     }
-    strncpy(feature_string, feature_code, sizeof(feature_string)-1);
+    strncpy(feature_string, feature_codes, sizeof(feature_string)-1);
     feature_string[sizeof(feature_string) - 1] = '\0';
 
     // Make sure query_ip is a well-formed IPv4 or IPv6 literal before it's
@@ -419,15 +398,15 @@ int na_query_xml(na_client_t *client, const char *query_ip, const char *feature_
     }
 
     /* Build the request */
-    temp_result = snprintf(request, sizeof(request),
+    temp_result = snprintf(request, request_size,
         "<request trans-id=\"%s\" ip=\"%s\" api-id=\"%d\" >",
         transaction_id, query_ip, client->api_id);
     if (temp_result < 0) {
         strcpy(error_msg, "Encoding error occurred while building request.");
         return 0;   // an encoding error occurred
     }
-    request_temp_len = (unsigned int)temp_result;
-    if (request_temp_len > sizeof(request)) {
+    request_temp_len = (size_t)temp_result;
+    if (request_temp_len >= request_size) {
         //request buffer is too small
         strcpy(error_msg, "Request buffer is too small.");
         return 0;
@@ -445,14 +424,14 @@ int na_query_xml(na_client_t *client, const char *query_ip, const char *feature_
             return 0;
         }
         // Add the db-specific query tag to the request
-        temp_result = snprintf(request + request_temp_len, sizeof(request) - request_temp_len, "<query db=\"%d\" />", db_number);
+        temp_result = snprintf(request + request_temp_len, request_size - request_temp_len, "<query db=\"%d\" />", db_number);
         if (temp_result < 0) {
             strcpy(error_msg, "Encoding error occurred while building request.");
             return 0;   // an encoding error occurred
         }
-        request_temp_len += (unsigned int)temp_result;
+        request_temp_len += (size_t)temp_result;
 
-        if (request_temp_len > sizeof(request)) {
+        if (request_temp_len >= request_size) {
             //request buffer is too small
             strcpy(error_msg, "Request buffer is too small.");
             return 0;
@@ -463,13 +442,13 @@ int na_query_xml(na_client_t *client, const char *query_ip, const char *feature_
     }
 
     // Add the final closing tag to the request
-    temp_result = snprintf(request + request_temp_len, sizeof(request) - request_temp_len, "</request>");
+    temp_result = snprintf(request + request_temp_len, request_size - request_temp_len, "</request>");
     if (temp_result < 0) {
         strcpy(error_msg, "Encoding error occurred while building request.");
         return 0;   // an encoding error occurred
     }
-    request_temp_len += (unsigned int)temp_result;
-    if (request_temp_len > sizeof(request)) {
+    request_temp_len += (size_t)temp_result;
+    if (request_temp_len >= request_size) {
         //request buffer is too small
         strcpy(error_msg, "Request buffer is too small.");
         return 0;
@@ -481,102 +460,162 @@ int na_query_xml(na_client_t *client, const char *query_ip, const char *feature_
         return 0;
     }
 
-    // Create and check socket, uses UDP
-    // Initialize IP connect structure
+    return 1;
+}
 
-    // Must match client->ip_family: sendto() rejects a sockaddr whose family doesn't
+// ****************************************************************************
+//
+// Function: na_socket_open()
+//
+// Purpose: Creates a non-blocking UDP socket, and connect()s it to the
+//          client's NetAcuity Server.
+//
+// Parameters: client    - Client handle (for the server address).
+//             error_msg - Out: the reason for any failure.
+//
+//    Returns:  The socket on success, or -1 on error.
+// ****************************************************************************
+static int na_socket_open(const na_client_t *client, char *error_msg)
+{
+    int                 sockfd;
+    struct sockaddr_in6 dest_addr;           // Will hold the destination addr
+    struct sockaddr_in  dest_addr4;          // Will hold the destination addr
+    struct sockaddr    *addr;
+    socklen_t           addr_len;
+
+    // Must match client->ip_family: connect() rejects a sockaddr whose family doesn't
     // match the socket's own address family.
-     ret                = sockfd = na_socket_create(client->ip_family == AF_INET ? PF_INET : PF_INET6, SOCK_DGRAM, 0);
-     if ( ret == -1 )
-     {
-         snprintf(error_msg, MAX_ERROR_MSG_LEN, "Could not create socket: %s.", strerror(errno));
-         return 0;
-     }
-
-     /* make it non-blocking, so we can timeout without using signals */
-     ret = set_nonblock_flag(sockfd, 1);
-     if ( ret == -1 )
-     {
-         close(sockfd);
-         snprintf(error_msg, MAX_ERROR_MSG_LEN, "Could not set socket to non-blocking: %s.", strerror(errno));
-         return 0;
-     }
-
-     len = strlen(request);
-
-     if (client->ip_family == AF_INET)
-     {
-         memset(&dest_addr, 0, sizeof(dest_addr));
-         /* it is an INET address */
-         dest_addr4.sin_family = client->ip_family;
-         dest_addr4.sin_port = htons(API_SERVER_UDP_PORT);
-
-         /* the server IP address, in network byte order */
-         api_server.s_addr = inet_addr(client->server_addr);
-         dest_addr4.sin_addr   = api_server;
-         bzero(&(dest_addr4.sin_zero), sizeof(dest_addr4.sin_zero));       // zero the rest of the struct
-
-          // Restricts the OS to only deliver datagrams from this address on this socket,
-          // rejecting spoofed/stray packets from any other source at the kernel level.
-          if (connect(sockfd, (struct sockaddr *)&dest_addr4, sizeof(dest_addr4)) == -1)
-          {
-              close(sockfd);
-              snprintf(error_msg, MAX_ERROR_MSG_LEN, "Unable to connect to NetAcuity Server: %s.", strerror(errno));
-              return 0;
-          }
-
-          dest_len = sizeof(dest_addr4);
-
-          // send request string to socket
-          ret=sendto(sockfd, request, len, 0, (struct sockaddr *)&dest_addr4,
-              dest_len);
-     }
-     else
-     {
-         memset(&dest_addr, 0, sizeof(dest_addr));
-         if (inet_pton(client->ip_family, client->server_addr, &dest_addr.sin6_addr) == -1)
-         {
-             close(sockfd);
-             strcpy(error_msg, "Invalid NetAcuity server address.");
-             return 0;
-         }
-         dest_addr.sin6_family = client->ip_family;
-         // the port we are going to send to, in network byte order
-         dest_addr.sin6_port = htons(API_SERVER_UDP_PORT);
-
-         // Restricts the OS to only deliver datagrams from this address on this socket,
-         // rejecting spoofed/stray packets from any other source at the kernel level.
-         if (connect(sockfd, (struct sockaddr *)&dest_addr, sizeof(dest_addr)) == -1)
-         {
-             close(sockfd);
-             snprintf(error_msg, MAX_ERROR_MSG_LEN, "Unable to connect to NetAcuity Server: %s.", strerror(errno));
-             return 0;
-         }
-
-         // send string to socket
-         dest_len = sizeof(dest_addr);
-         len     = strlen(request);
-         ret      = sendto(sockfd, request, len, 0,
-                                  (struct sockaddr *)&dest_addr, dest_len);
-     }
-     if ( ret < len )
-     {
-         /* this shouldn't happen, bail out */
-         close(sockfd);
-         snprintf(error_msg, MAX_ERROR_MSG_LEN, "Sent fewer bytes than expected (sent: %d, expected: %d).", ret, len);
-         return 0;
-     }
-
-    /* make timeout structure */
-    tv.tv_sec = 0;
-    tv.tv_usec = client->timeout;
-
-    /* Deal with Solaris issue with US being > 1000000 (1 sec) */
-    while ( tv.tv_usec >= 1000000 )
+    // Close-on-exec, so a long-lived connection's socket isn't inherited by
+    // programs the caller runs (e.g. Apache CGI children).
+#ifdef SOCK_CLOEXEC
+    sockfd = na_socket_create(client->ip_family == AF_INET ? PF_INET : PF_INET6, SOCK_DGRAM | SOCK_CLOEXEC, 0);
+#else
+    sockfd = na_socket_create(client->ip_family == AF_INET ? PF_INET : PF_INET6, SOCK_DGRAM, 0);
+#endif
+    if ( sockfd == -1 )
     {
-        tv.tv_usec -= 1000000;
-        tv.tv_sec++;
+        snprintf(error_msg, MAX_ERROR_MSG_LEN, "Could not create socket: %s.", strerror(errno));
+        return -1;
     }
+#ifndef SOCK_CLOEXEC
+    if ( fcntl(sockfd, F_SETFD, FD_CLOEXEC) == -1 )
+    {
+        snprintf(error_msg, MAX_ERROR_MSG_LEN, "Could not set socket to close-on-exec: %s.", strerror(errno));
+        close(sockfd);
+        return -1;
+    }
+#endif
+
+    /* make it non-blocking, so we can timeout without using signals */
+    if ( set_nonblock_flag(sockfd, 1) == -1 )
+    {
+        snprintf(error_msg, MAX_ERROR_MSG_LEN, "Could not set socket to non-blocking: %s.", strerror(errno));
+        close(sockfd);
+        return -1;
+    }
+
+    if (client->ip_family == AF_INET)
+    {
+        memset(&dest_addr4, 0, sizeof(dest_addr4));
+        /* it is an INET address */
+        dest_addr4.sin_family = client->ip_family;
+        dest_addr4.sin_port = htons(API_SERVER_UDP_PORT);
+
+        /* the server IP address, in network byte order */
+        if (inet_pton(client->ip_family, client->server_addr, &dest_addr4.sin_addr) <= 0)
+        {
+            close(sockfd);
+            strcpy(error_msg, "Invalid NetAcuity server address.");
+            return -1;
+        }
+        addr     = (struct sockaddr *)&dest_addr4;
+        addr_len = sizeof(dest_addr4);
+    }
+    else
+    {
+        memset(&dest_addr, 0, sizeof(dest_addr));
+        if (inet_pton(client->ip_family, client->server_addr, &dest_addr.sin6_addr) <= 0)
+        {
+            close(sockfd);
+            strcpy(error_msg, "Invalid NetAcuity server address.");
+            return -1;
+        }
+        dest_addr.sin6_family = client->ip_family;
+        // the port we are going to send to, in network byte order
+        dest_addr.sin6_port = htons(API_SERVER_UDP_PORT);
+        addr     = (struct sockaddr *)&dest_addr;
+        addr_len = sizeof(dest_addr);
+    }
+
+    // Restricts the OS to only deliver datagrams from this address on this socket,
+    // rejecting spoofed/stray packets from any other source at the kernel level.
+    if (connect(sockfd, addr, addr_len) == -1)
+    {
+        snprintf(error_msg, MAX_ERROR_MSG_LEN, "Unable to connect to NetAcuity Server: %s.", strerror(errno));
+        close(sockfd);
+        return -1;
+    }
+
+    return sockfd;
+}
+
+// ****************************************************************************
+//
+// Function: na_xml_exchange()
+//
+// Purpose: Sends request on sockfd, and receives the (possibly multi-packet)
+//          XML response into response.  Does not close sockfd.
+//
+// Parameters: sockfd     - Socket from na_socket_open().
+//             timeout_us - Time to wait for each response packet.
+//             request    - The request string to send.
+//             response   - Output buffer for the response.
+//             max_size   - The size of the response buffer.
+//             error_msg  - Out: the reason for any failure.
+//
+//    Returns:  1 - Success
+//              0 - Error
+// ****************************************************************************
+static int na_xml_exchange(int sockfd, int timeout_us, const char *request,
+    char *response, size_t max_size, char *error_msg)
+{
+    int                ret;                 // Hold various function return
+                                            // values
+    struct pollfd      pfd;                 // Descriptor to wait on with poll()
+    int                timeout_ms;          // timeout_us, rounded up to whole ms
+    int                len;                 // Length parameter for send() call
+    api_xml_response   server_response;
+    int                num_packets_received = 0;
+    int                packets_to_receive = 1;
+    int                last_packet_num = 0;
+    char               thisPacketNum_str[XML_PACKET_NUM_DIGITS + 1];
+    char               numPacketsToReceive_str[XML_PACKET_NUM_DIGITS + 1];
+    size_t             response_len;
+
+    /* zero buffers */
+    bzero(thisPacketNum_str, sizeof(thisPacketNum_str));
+    bzero(numPacketsToReceive_str, sizeof(numPacketsToReceive_str));
+    response[0] = '\0';
+
+    // send request string to socket
+    len = strlen(request);
+    ret = send(sockfd, request, len, 0);
+    if ( ret < 0 )
+    {
+        snprintf(error_msg, MAX_ERROR_MSG_LEN, "Could not send request to NetAcuity Server: %s.", strerror(errno));
+        return 0;
+    }
+    if ( ret < len )
+    {
+        /* this shouldn't happen, bail out */
+        snprintf(error_msg, MAX_ERROR_MSG_LEN, "Sent fewer bytes than expected (sent: %d, expected: %d).", ret, len);
+        return 0;
+    }
+
+    // poll() rather than select(), which can't handle descriptors of
+    // FD_SETSIZE (1024) or more.  poll() waits in milliseconds; round up, so
+    // that a timeout of under 1 ms still waits.
+    timeout_ms = timeout_us / 1000 + (timeout_us % 1000 != 0);
 
     num_packets_received = 0;
     packets_to_receive = 1;  // this will get updated on first packet
@@ -587,27 +626,15 @@ int na_query_xml(na_client_t *client, const char *query_ip, const char *feature_
         // clear any stale data from a previous packet before receiving the next one
         memset(&server_response, 0, sizeof(server_response));
 
-        // wait for the response data
-        FD_ZERO(&fds);
-        FD_SET(sockfd, &fds);
-
-        tv.tv_sec = 0;
-        tv.tv_usec = client->timeout;
-
-        /* Deal with Solaris issue with US being > 1000000 (1 sec) */
-        while ( tv.tv_usec >= 1000000 )
-        {
-            tv.tv_usec -= 1000000;
-            tv.tv_sec++;
-        }
-
         /* wait until the timeout or we have data from the server */
-        ret=select(sockfd+1, &fds, NULL, NULL, &tv);
+        pfd.fd = sockfd;
+        pfd.events = POLLIN;
+        pfd.revents = 0;
+        ret = poll(&pfd, 1, timeout_ms);
 
         /* For error or timeout */
         if ( ret <= 0 )
         {
-            close(sockfd);
             if (ret == 0)
             {
                 strcpy(error_msg, "Timeout waiting for response from NetAcuity Server.");
@@ -619,15 +646,24 @@ int na_query_xml(na_client_t *client, const char *query_ip, const char *feature_
             return 0;
         }
 
-        /* Receive information from server */
-        ret = recvfrom(sockfd, &server_response, sizeof(server_response), 0,
-            (struct sockaddr *)&dest_addr, &dest_len);
+        /* Receive information from server, leaving room for a terminating NUL */
+        ret = recv(sockfd, &server_response, sizeof(server_response) - 1, 0);
 
         /* Check to see if got actual good data off socket */
+        if ( ret < 0 )
+        {
+            snprintf(error_msg, MAX_ERROR_MSG_LEN, "Error receiving response from NetAcuity Server: %s.", strerror(errno));
+            return 0;
+        }
         if ( ret < 6 )
         {
-            close(sockfd);
             strcpy(error_msg, "Received an invalid response from the NetAcuity Server.");
+            return 0;
+        }
+        // A datagram that fills the whole buffer may have been truncated
+        if (ret >= (int)sizeof(server_response) - 1)
+        {
+            strcpy(error_msg, "Received an oversized response from the NetAcuity Server.");
             return 0;
         }
         strncpy(thisPacketNum_str, server_response.thisPacketNum, XML_PACKET_NUM_DIGITS);
@@ -637,7 +673,6 @@ int na_query_xml(na_client_t *client, const char *query_ip, const char *feature_
 
         if ( num_packets_received - 1 != last_packet_num )
         {
-            close(sockfd);
             snprintf(error_msg, MAX_ERROR_MSG_LEN, "Packets received out of order (got: %d, last: %d).", num_packets_received, last_packet_num);
             return 0;
 
@@ -647,7 +682,6 @@ int na_query_xml(na_client_t *client, const char *query_ip, const char *feature_
         response_len += strlen(server_response.response);
         if ( response_len >= max_size )
         {
-            close(sockfd);
             strcpy(error_msg, "Response will exceed passed buffer size.");
             return 0;
         }
@@ -656,40 +690,185 @@ int na_query_xml(na_client_t *client, const char *query_ip, const char *feature_
         strcat(response, server_response.response);
         last_packet_num = num_packets_received;
     }
-    // close the socket
-    close(sockfd);
 
+    return 1;
+}
+
+// ****************************************************************************
+//
+// Function: na_xml_server_error()
+//
+// Purpose: Checks a response for a NetAcuity Server-reported error.
+//
+// Parameters: response  - The XML response.
+//             error_msg - Out: the server's error message, or "" if none.
+//
+//    Returns:  1 - If the server reported an error
+//              0 - Otherwise
+// ****************************************************************************
+static int na_xml_server_error(const char *response, char *error_msg)
+{
     get_xml_field(response, "error", error_msg, MAX_ERROR_MSG_LEN);
     if (strcmp(error_msg, "FieldNotFound") == 0)
     {
         strcpy(error_msg, "");
+        return 0;
     }
-    else
+    return 1;
+}
+
+// ****************************************************************************
+//
+// Function: na_xml_check_echo()
+//
+// Purpose: Makes sure the response is in sync with this request, by checking
+//          that it echoes back the request's transaction ID and IP address.
+//
+// Parameters: response       - The XML response.
+//             transaction_id - The request's transaction ID.
+//             query_ip       - The request's IP address.
+//             error_msg      - Out: the reason for any failure.
+//
+//    Returns:  1 - If the response matches the request
+//              0 - Otherwise
+// ****************************************************************************
+static int na_xml_check_echo(const char *response, const char *transaction_id,
+    const char *query_ip, char *error_msg)
+{
+    char response_trans_id[MAX_TRANSACTION_ID];
+    char response_ip[MAX_IP_LEN];
+
+    get_xml_field(response, "trans-id", response_trans_id, sizeof(response_trans_id));
+    if (strcmp(response_trans_id, transaction_id) != 0)
     {
+        strcpy(error_msg, "Transaction ID mismatch.");
         return 0;
     }
 
-    // Make sure the response is in sync with this request.
+    get_xml_field(response, "ip", response_ip, sizeof(response_ip));
+    if (!ip_strings_equal(response_ip, query_ip))
     {
-        char response_trans_id[MAX_TRANSACTION_ID];
-        get_xml_field(response, "trans-id", response_trans_id, sizeof(response_trans_id));
-        if (strcmp(response_trans_id, transaction_id) != 0)
-        {
-            strcpy(error_msg, "Transaction ID mismatch.");
-            return 0;
-        }
-    }
-    {
-        char response_ip[MAX_IP_LEN];
-        get_xml_field(response, "ip", response_ip, sizeof(response_ip));
-        if (!ip_strings_equal(response_ip, query_ip))
-        {
-            strcpy(error_msg, "Response address mismatch.");
-            return 0;
-        }
+        strcpy(error_msg, "Response address mismatch.");
+        return 0;
     }
 
-    return 1;  // success
+    return 1;
+}
+
+// ****************************************************************************
+//
+// Function: na_socket_drain()
+//
+// Purpose: Discards anything already waiting on a (non-blocking) socket, so
+//          that it can't be mistaken for part of the next response: e.g. a
+//          duplicated datagram, or an error (e.g. ECONNREFUSED) left by an
+//          ICMP message.
+//
+//          Gives up after NA_MAX_DRAIN recv() calls, so a socket that keeps
+//          receiving (e.g. a flood of datagrams) can't keep it looping.
+//
+// Parameters: sockfd - Socket from na_socket_open().
+//
+//    Returns:  1 - Nothing left on the socket
+//              0 - Gave up with the socket possibly still receiving
+// ****************************************************************************
+#define NA_MAX_DRAIN  256
+
+static int na_socket_drain(int sockfd)
+{
+    char buf[64];
+    int  i;
+
+    for (i = 0; i < NA_MAX_DRAIN; i++)
+    {
+        if ( recv(sockfd, buf, sizeof(buf), 0) >= 0 )
+        {
+            continue;
+        }
+        if ( errno == EAGAIN || errno == EWOULDBLOCK )
+        {
+            return 1;  // nothing left
+        }
+        // Any other error is a pending socket error (which recv() reports
+        // once, then clears) or EINTR, and may have datagrams queued behind
+        // it, so keep draining.
+    }
+    return 0;
+}
+
+// ****************************************************************************
+//
+// Function: na_connection_close()
+//
+// Purpose: Closes conn's socket, if open.  It is re-opened on the next query.
+//
+// Parameters: conn - The connection whose socket to close.
+//
+// ****************************************************************************
+static void na_connection_close(na_connection_t *conn)
+{
+    if ( conn->sockfd >= 0 )
+    {
+        close(conn->sockfd);
+        conn->sockfd = -1;
+    }
+}
+
+static int na_connection_query(na_connection_t *conn, const char *query_ip, const char *feature_codes,
+    const char *transaction_id, char *response, size_t max_size, char *error_msg);
+
+// ****************************************************************************
+//
+// Function: na_query_xml()
+//
+// Purpose: Queries the NetAcuity databases specified in feature_codes for
+//          the IP address passed and returns the response in the memory
+//          supplied by the caller.  The response will be an XML string
+//          that can be passed to your favorite XML parser.
+//          Make sure that the buffer "response" is large enough to handle
+//          the entire response, otherwise an error will occur and no
+//          response data will be returned.
+//          If a timeout or error occurs, it returns 0 and the
+//          error reason will be returned in "error_msg".
+//
+// Parameters: client      - Client handle from na_client_new().
+//             query_ip    - IPv4 or IPv6 address to query
+//             feature_codes - Comma separated list of database features to query
+//             transaction_id - A user-supplied transaction ID (can be "", or
+//                           NULL to have one generated automatically). At
+//                           most MAX_TRANSACTION_ID - 1 (63) characters.
+//             response    - Pointer to location response should be returned
+//             max_size    - The size of the response memory.  An error will
+//                           occur if response exceeds this size.
+//             error_msg   - Pointer to a buffer of at least MAX_ERROR_MSG_LEN
+//                           bytes, which receives the reason for any error
+//                           ("" on success)
+//
+//    Returns:  1 - Success
+//              0 - Error
+// ****************************************************************************
+int na_query_xml(na_client_t *client, const char *query_ip, const char *feature_code, const char *transaction_id,
+    char *response, size_t max_size, char *error_msg)
+{
+    na_connection_t    conn;
+    int                ret;
+
+    if ( !client )
+    {
+        strcpy(error_msg, "Invalid client handle.");
+        return 0;
+    }
+
+    // A one-shot connection, whose socket is opened by the query and then closed.
+    conn.client = *client;
+    conn.sockfd = -1;
+
+    ret = na_connection_query(&conn, query_ip, feature_code, transaction_id,
+        response, max_size, error_msg);
+
+    na_connection_close(&conn);
+
+    return ret;
 }
 
 // ****************************************************************************
@@ -772,3 +951,171 @@ char *get_xml_field(const char *response, const char *field_name, char *value, s
     return value;
 }
 
+// ****************************************************************************
+//
+// Function: na_connection_new()
+//
+// Purpose: Allocates a persistent connection to a client's NetAcuity Server.
+//          The client's settings are copied, so it may be freed while the
+//          connection is still in use.  The socket isn't opened until the
+//          first query.  Must be released with na_connection_free().
+//
+// Parameters: client - Client handle from na_client_new().
+//
+// Returns: A new connection handle, or NULL if client is NULL, or if
+//          allocation fails.
+//
+// ****************************************************************************
+na_connection_t *na_connection_new(const na_client_t *client)
+{
+    na_connection_t *conn;
+
+    if ( !client )
+    {
+        return NULL;
+    }
+
+    conn = (na_connection_t *)malloc(sizeof(*conn));
+    if ( !conn )
+    {
+        return NULL;
+    }
+
+    conn->client = *client;
+    conn->sockfd = -1;
+
+    return conn;
+}
+
+// ****************************************************************************
+//
+// Function: na_connection_free()
+//
+// Purpose: Closes a connection's socket, and releases the handle.  Passing
+//          NULL is a no-op.
+//
+// Parameters: conn - The connection handle to release.
+//
+// ****************************************************************************
+void na_connection_free(na_connection_t *conn)
+{
+    if ( !conn )
+    {
+        return;
+    }
+    na_connection_close(conn);
+    free(conn);
+}
+
+// ****************************************************************************
+//
+// Function: na_connection_query()
+//
+// Purpose: Sends the query over conn's socket, opening it first if needed.
+//          Shared by na_query_xml() and na_connection_query_xml().
+//
+// Parameters: conn - Connection handle.
+//             (the rest are the same as for na_query_xml())
+//
+//    Returns:  1 - Success
+//              0 - Error
+// ****************************************************************************
+static int na_connection_query(na_connection_t *conn, const char *query_ip, const char *feature_codes,
+    const char *transaction_id, char *response, size_t max_size, char *error_msg)
+{
+    char               request[MAX_XML_REQUEST_BUFF_SIZE];
+    char               generated_transaction_id[MAX_TRANSACTION_ID];
+
+    if ( !conn )
+    {
+        strcpy(error_msg, "Invalid connection handle.");
+        return 0;
+    }
+
+    // A caller that omits a transaction ID (passes NULL) gets one generated automatically.
+    if ( !transaction_id )
+    {
+        generate_transaction_id(generated_transaction_id, sizeof(generated_transaction_id));
+        transaction_id = generated_transaction_id;
+    }
+
+    strcpy(error_msg, "");
+    response[0] = '\0';
+
+    if ( !na_build_xml_request(&conn->client, query_ip, feature_codes, transaction_id,
+             request, sizeof(request), error_msg) )
+    {
+        return 0;
+    }
+
+    // If the drain gives up, start over on a new socket rather than risk
+    // reading whatever is still arriving.
+    if ( conn->sockfd != -1 && !na_socket_drain(conn->sockfd) )
+    {
+        na_connection_close(conn);
+    }
+
+    if ( conn->sockfd == -1 )
+    {
+        conn->sockfd = na_socket_open(&conn->client, error_msg);
+        if ( conn->sockfd == -1 )
+        {
+            return 0;
+        }
+    }
+
+    // Once the request has been sent, any failure may leave more of this
+    // response in flight, so close the socket rather than risk reading it
+    // as part of the next response.
+    if ( !na_xml_exchange(conn->sockfd, conn->client.timeout, request, response, max_size, error_msg) )
+    {
+        na_connection_close(conn);
+        return 0;
+    }
+
+    // The server sends error responses without the trans-id or ip, so they
+    // can't be echo-checked.  Close the socket, so that a late duplicate of
+    // this error can't be reported as the next query's.
+    if ( na_xml_server_error(response, error_msg) )
+    {
+        na_connection_close(conn);
+        return 0;
+    }
+
+    if ( !na_xml_check_echo(response, transaction_id, query_ip, error_msg) )
+    {
+        na_connection_close(conn);
+        return 0;
+    }
+
+    return 1;  // success
+}
+
+// ****************************************************************************
+//
+// Function: na_connection_query_xml()
+//
+// Purpose: Same as na_query_xml(), but sends the query over conn's
+//          persistent socket, opening it first if needed.
+//
+// Parameters: conn - Connection handle from na_connection_new().
+//             (the rest are the same as for na_query_xml(), except that ""
+//             as the transaction_id also gets one generated)
+//
+//    Returns:  1 - Success
+//              0 - Error
+// ****************************************************************************
+int na_connection_query_xml(na_connection_t *conn, const char *query_ip, const char *feature_codes,
+    const char *transaction_id, char *response, size_t max_size, char *error_msg)
+{
+    // A late duplicate of an earlier response can still arrive on a re-used
+    // socket. With "" as every query's transaction ID, the echo check couldn't
+    // tell it from this query's response, so generate one instead.
+    if ( transaction_id && transaction_id[0] == '\0' )
+    {
+        transaction_id = NULL;
+    }
+
+    return na_connection_query(conn, query_ip, feature_codes, transaction_id,
+        response, max_size, error_msg);
+}

@@ -16,8 +16,8 @@
 ##
 ## Makefile for the NetAcuity Client API unit tests.
 ##
-## These tests cover all logic that does not require a
-## running NetAcuity server (parsing, validation, get_xml_field).
+## These tests need no running NetAcuity server; the
+## network tests use a mock server on 127.0.0.1.
 ##
 ## Usage:
 ##   make          - compile the test binary
@@ -35,7 +35,7 @@ TARGET = test_netacuity_api
 
 all: $(TARGET)
 
-$(TARGET): test_netacuity_api.c
+$(TARGET): test_netacuity_api.c ../netacuity_api.c ../netacuity_api.h
 	$(CC) $(CFLAGS) -o $@ $<
 
 test: $(TARGET)

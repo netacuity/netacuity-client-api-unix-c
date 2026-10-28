@@ -95,6 +95,7 @@ For example:
           NetAcuityDBS 26,33,35,93
 
           ## The maximum time to wait for NetAcuity responses in milliseconds
+          ##  (1000 if omitted or 0; at most 2147483)
           NetAcuityTimeout 1000
 
           ## The API ID to use when querying the NetAcuity Server
@@ -153,7 +154,7 @@ The details on each of the NetAcuity Database feature-codes,
 including a list of their respective fields, is available
 in the NetAcuity documentation at:
 
-    https://docs.netacuity.com/
+    https://docs.digitalelement.com/
 
 Additionally, the following common NetAcuity variables are also available:
   NA_IP - the IP address that was queried on the NetAcuity Server

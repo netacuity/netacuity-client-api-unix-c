@@ -33,8 +33,8 @@ TARGET=test_api_xml
 
 DEFS =  -DHAVE_MALLOC_H=1 -DHAVE_SYS_SELECT_H=1 -DHAVE_NET_ROUTE_H=1 -DHAVE_STRERROR=1 -DHAVE_USLEEP=1 -DHAVE_SETLINEBUF=1 -DBYTESWAP_IP_HDR=1 -DHAVE_ICMP_NEXTMTU=1 
 LINUX_ARGS=$(API)/netacuity_api.o test_api_xml.o
-FREEBSD_ARGS=$(API)/netacuity_api.o test_api_xml.o ../strtok.o
-SOLARIS_ARGS=$(API)/netacuity_api.o test_api_xml.o ../strtok.o
+FREEBSD_ARGS=$(API)/netacuity_api.o test_api_xml.o
+SOLARIS_ARGS=$(API)/netacuity_api.o test_api_xml.o
 
 
 
@@ -80,4 +80,3 @@ clean:
 $(API)/netacuity_api.o: $(API)/netacuity_api.c $(API)/netacuity_api.h
 
 test_api_xml.o: test_api_xml.c $(API)/netacuity_api.h
-../strtok.o: ../strtok.c
