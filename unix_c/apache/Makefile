@@ -64,6 +64,5 @@ clean:
 	rm  -f $(API_DIR)/*.o
 
 $(API_DIR)/netacuity_api.o: $(API_DIR)/netacuity_api.c $(API_DIR)/netacuity_api.h
-$(API_DIR)/strtok.o: $(API_DIR)/strtok.c
 
 mod_netacuity.so: mod_netacuity.c $(API_DIR)/netacuity_api.h

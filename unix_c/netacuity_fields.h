@@ -247,6 +247,16 @@ typedef enum netacuity_field_id_t {
     NA_FLD_OBSERVED_COUNTRIES_ISO3_5WK,
     NA_FLD_OBSERVED_COUNTRIES_ISO2_5WK,
 
+    // DMA DB = FC 38
+    NA_FLD_DMA_CODE = 3800,
+    NA_FLD_DMA_REGIONS,
+    NA_FLD_DMA_NAME,
+
+    // DMA_MAX DB = FC 39
+    NA_FLD_DMAMAX_CODE = 3900,
+    NA_FLD_DMAMAX_REGIONS,
+    NA_FLD_DMAMAX_NAME,
+
     // ALTERNATE_AREA SA1 DB = FC 40
     NA_FLD_AA_SA1_COUNTRY = 4000,
     NA_FLD_AA_SA1_VALUE,
@@ -278,6 +288,14 @@ typedef enum netacuity_field_id_t {
     // ALTERNATE_AREA_MAX PLZ8 DB = FC 47
     NA_FLD_AAMAX_PLZ8_COUNTRY = 4700,
     NA_FLD_AAMAX_PLZ8_VALUE,
+
+    // REGIONAL_MEDIA_MARKET DB = FC 51
+    NA_FLD_RMM_COUNTRY = 5100,
+    NA_FLD_RMM_ID,
+
+    // REGIONAL_MEDIA_MARKET_MAX DB = FC 52
+    NA_FLD_RMMMAX_COUNTRY = 5200,
+    NA_FLD_RMMMAX_ID,
 
     NA_FLD_MAXIMUM_ID   //this should always be the last item in this enum
 } netacuity_field_id;
@@ -525,6 +543,16 @@ static netacuity_field netacuity_field_dictionary[] = {
     { 37, NA_FLD_TYPE_STRING,   NA_FLD_OBSERVED_COUNTRIES_ISO3_5WK,  "oc-iso3-5wk" },
     { 37, NA_FLD_TYPE_STRING,   NA_FLD_OBSERVED_COUNTRIES_ISO2_5WK,  "oc-iso2-5wk" },
 
+    // DMA DB
+    { 38, NA_FLD_TYPE_INT,      NA_FLD_DMA_CODE,            "dma-code" },
+    { 38, NA_FLD_TYPE_STRING,   NA_FLD_DMA_REGIONS,         "dma-regions" },
+    { 38, NA_FLD_TYPE_STRING,   NA_FLD_DMA_NAME,            "dma-name" },
+
+    // DMA_MAX DB
+    { 39, NA_FLD_TYPE_INT,      NA_FLD_DMAMAX_CODE,         "dmamax-code" },
+    { 39, NA_FLD_TYPE_STRING,   NA_FLD_DMAMAX_REGIONS,      "dmamax-regions" },
+    { 39, NA_FLD_TYPE_STRING,   NA_FLD_DMAMAX_NAME,         "dmamax-name" },
+
     // ALTERNATE_AREA SA1 DB
     { 40, NA_FLD_TYPE_STRING,   NA_FLD_AA_SA1_COUNTRY,      "aa-sa1-country" },
     { 40, NA_FLD_TYPE_STRING,   NA_FLD_AA_SA1_VALUE,        "aa-sa1-value" },
@@ -556,6 +584,14 @@ static netacuity_field netacuity_field_dictionary[] = {
     // ALTERNATE_AREA_MAX PLZ8 DB
     { 47, NA_FLD_TYPE_STRING,   NA_FLD_AAMAX_PLZ8_COUNTRY,  "aamax-plz8-country" },
     { 47, NA_FLD_TYPE_STRING,   NA_FLD_AAMAX_PLZ8_VALUE,    "aamax-plz8-value" },
+
+    // REGIONAL_MEDIA_MARKET DB
+    { 51, NA_FLD_TYPE_STRING,   NA_FLD_RMM_COUNTRY,         "rmm-country" },
+    { 51, NA_FLD_TYPE_STRING,   NA_FLD_RMM_ID,              "rmm-id" },
+
+    // REGIONAL_MEDIA_MARKET_MAX DB
+    { 52, NA_FLD_TYPE_STRING,   NA_FLD_RMMMAX_COUNTRY,      "rmmmax-country" },
+    { 52, NA_FLD_TYPE_STRING,   NA_FLD_RMMMAX_ID,           "rmmmax-id" },
 
     {  0, NA_FLD_TYPE_NULL,     NA_FLD_NULL,    "" }  //this should always be the last item in this array
 };

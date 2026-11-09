@@ -161,7 +161,7 @@ The details on each of the NetAcuity Database feature-codes,
 including a list of their respective fields, is available
 in the NetAcuity documentation at:
 
-    https://docs.netacuity.com/
+    https://docs.digitalelement.com/
 
 Additionally, the following common NetAcuity variables are also available:
   $na_ip - the IP address that was queried on the NetAcuity Server

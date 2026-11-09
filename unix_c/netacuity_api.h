@@ -19,6 +19,10 @@
 
 #include <stddef.h>
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #define   API_SERVER_UDP_PORT  5400
 
 /* DB feature codes */
@@ -46,6 +50,8 @@
 #define NA_NODIFY          36
 #define NA_DECODE          93
 #define NA_OBSERVED_COUNTRIES 37
+#define NA_DMA             38
+#define NA_DMA_MAX         39
 #define NA_AA_SA1          40
 #define NA_AAMAX_SA1       41
 #define NA_AA_IRIS         42
@@ -54,6 +60,8 @@
 #define NA_AAMAX_ZIP4      45
 #define NA_AAMAX_IRIS      46
 #define NA_AAMAX_PLZ8      47
+#define NA_RMM             51
+#define NA_RMM_MAX         52
 
 // valid range for a db-feature/db number requested in a query
 #define NA_MIN_DB_FEATURE   3
@@ -101,17 +109,19 @@ typedef struct na_client na_client_t;
    Function:    na_client_new
    Returns:     A new client handle, or NULL if server_ip is not a
                 well-formed IPv4/IPv6 literal, api_id is not between 0 and
-                127, or allocation fails.
+                127, timeout_us is not positive, or allocation fails.
    Parameters:  server_ip  - IP address in dotted notation of the NetAcuity
                              Server to use.
                 api_id     - Integer between 0 and 127. 0 is left as
                              "unregistered".
                 timeout_us - Maximum time to wait on network calls, in
                              microseconds (this includes both connect and
-                             query). Pass NA_DEFAULT_TIMEOUT_US (2000000, i.e.
-                             2 seconds) to match this library's own default,
-                             or use na_client_new_with_default_timeout() to
-                             have it applied automatically.
+                             query), rounded up to whole milliseconds.
+                             Must be positive. Pass NA_DEFAULT_TIMEOUT_US
+                             (2000000, i.e. 2 seconds) to match this
+                             library's own default, or use
+                             na_client_new_with_default_timeout() to have it
+                             applied automatically.
    Description: Allocates and initializes a client handle. Must be passed
                 explicitly to every na_query_*() call, and released with
                 na_client_free() when no longer needed.
@@ -151,23 +161,28 @@ void na_client_free(na_client_t *client);
    Function:    na_query_xml
    Returns:     1-success, 0=error
    Parameters:  client: Client handle from na_client_new().
-                ip: IP address to query in dotted-notation
+                query_ip: IPv4 or IPv6 address to query
                 feature_codes: Comma separated list of database features to query
                 transaction_id:  A user-supplied transaction ID (can be "", or NULL
-                          to have one generated automatically)
+                          to have one generated automatically). At most
+                          MAX_TRANSACTION_ID - 1 (63) characters.
                 response: Pointer to location response should be returned
                 max_size: The size of the response memory.  An error will
                           occur if response exceeds this size.
+                error_msg: Pointer to a buffer of at least MAX_ERROR_MSG_LEN
+                          bytes, which receives the reason for any error
+                          ("" on success)
    Description: Queries the NetAcuity databases specified in feature_codes for
                 the IP address passed and returns the response in the memory
                 supplied by the caller.  The response will be an XML string
                 that can be passed to your favorite XML parser or you can
-                call the xml_get_field() to retrieve specific fields.
+                call get_xml_field() to retrieve specific fields.
                 Make sure that the buffer "response" is large enough to handle
-                the entire response, otherwise an error will occur and no
-                response data will be returned.
+                the entire response, otherwise an error will occur.
                 If a timeout or error occurs, it returns 0 and the
-                error reason will be returned in "response".
+                error reason will be returned in "error_msg". "response"
+                may then hold part of a response, so use it only on
+                success.
 ***/
 int na_query_xml(na_client_t *client, const char *query_ip, const char *feature_codes, const char *transaction_id,
                  char *response, size_t max_size, char *error_msg);
@@ -199,5 +214,62 @@ int na_query_xml(na_client_t *client, const char *query_ip, const char *feature_
                 
 ***/
 char *get_xml_field(const char *response, const char *field_name, char *value, size_t size);
+
+/* Opaque persistent-connection handle: a copy of a client's settings, plus a
+ * UDP socket that is kept open across queries (instead of being opened and
+ * closed for every query, as na_query_xml() does). Its definition is private
+ * to netacuity_api.c. Create one with na_connection_new() and release it with
+ * na_connection_free().
+ * Unlike na_client_t, a connection is NOT safe to use from more than one
+ * thread at a time; use a separate connection per thread. Nor should one be
+ * used by both the parent and child after a fork(), since they would share
+ * its socket. */
+typedef struct na_connection na_connection_t;
+
+/***
+   Function:    na_connection_new
+   Returns:     A new connection handle, or NULL if client is NULL or
+                allocation fails.
+   Parameters:  client - Client handle from na_client_new(). Its settings are
+                         copied, so it may be freed while the connection is
+                         still in use.
+   Description: Allocates a persistent connection to the client's NetAcuity
+                Server. The socket is opened by the first query, and is
+                re-opened by the next query after any network error. Must be
+                released with na_connection_free() when no longer needed.
+***/
+na_connection_t *na_connection_new(const na_client_t *client);
+
+/***
+   Function:    na_connection_free
+   Returns:     void
+   Parameters:  conn - The connection handle to release. NULL is a no-op.
+   Description: Closes the connection's socket, and releases a connection
+                handle allocated by na_connection_new().
+***/
+void na_connection_free(na_connection_t *conn);
+
+/***
+   Function:    na_connection_query_xml
+   Returns:     1-success, 0=error
+   Parameters:  conn: Connection handle from na_connection_new().
+                All other parameters are the same as for na_query_xml(),
+                except that a transaction_id of "" is treated like NULL
+                (one is generated).
+                The transaction_id must be different for every query on a
+                connection (or "" or NULL). A late duplicate of an earlier
+                response can arrive on the connection's socket, and only
+                the transaction ID tells it apart from this query's
+                response; if it matches, the earlier response is returned
+                as this query's.
+   Description: Same as na_query_xml(), but sends the query over the
+                connection's persistent socket.
+***/
+int na_connection_query_xml(na_connection_t *conn, const char *query_ip, const char *feature_codes,
+                 const char *transaction_id, char *response, size_t max_size, char *error_msg);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif
